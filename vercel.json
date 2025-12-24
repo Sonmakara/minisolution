@@ -1,9 +1,8 @@
-
 {
   "version": 2,
   "cleanUrls": true,
   "trailingSlash": false,
-  "outputDirectory": "build",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/(.*)",

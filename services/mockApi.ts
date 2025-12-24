@@ -42,7 +42,7 @@ const initialUsers: User[] = [
   { id: 'admin-001', name: 'System Administrator', email: 'admin@admin.com', password: 'admin', role: 'ADMIN', status: UserStatus.ACTIVE },
   { id: '1', name: 'John Doe', email: 'john.doe@enterprise.com', password: 'password', role: 'USER', status: UserStatus.ACTIVE },
   { id: '2', name: 'Sarah Tech', email: 'sarah.t@enterprise.com', password: 'password', role: 'TECHNICIAN', status: UserStatus.ACTIVE },
-  { id: '3', name: 'Admin Root', email: 'makara@enterprise.com', password: 'admin@123', role: 'ADMIN', status: UserStatus.ACTIVE },
+  { id: '3', name: 'Admin Root', email: 'makara@admin.com', password: 'admin@123', role: 'ADMIN', status: UserStatus.ACTIVE },
   { id: '4', name: 'Mike Ross', email: 'mike.r@enterprise.com', password: 'password', role: 'USER', status: UserStatus.DISABLED },
 ];
 
