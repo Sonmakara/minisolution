@@ -1,0 +1,7 @@
+{
+  "name": "Mini Solution for IT Troubleshooting",
+  "description": "A comprehensive IT support platform featuring automated diagnostics, a knowledge base, and a support ticket system powered by Gemini AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
