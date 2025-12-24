@@ -8,23 +8,26 @@ import {
   CircleDot, 
   Sparkles,
   Loader2,
-  ChevronRight
+  ChevronRight,
+  Globe,
+  ExternalLink
 } from 'lucide-react';
-import { getDiagnosticHelp } from '../services/geminiService';
-import { DiagnosisResult } from '../types';
+import { getDiagnosticHelp, GroundedDiagnosisResult } from '../services/geminiService';
 
 const Troubleshoot: React.FC = () => {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<DiagnosisResult | null>(null);
+  const [result, setResult] = useState<GroundedDiagnosisResult | null>(null);
+  const [useWebSearch, setUseWebSearch] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
 
     setIsLoading(true);
+    setResult(null);
     try {
-      const data = await getDiagnosticHelp(query);
+      const data = await getDiagnosticHelp(query, useWebSearch);
       setResult(data);
     } catch (error) {
       console.error(error);
@@ -47,7 +50,7 @@ const Troubleshoot: React.FC = () => {
         </p>
       </div>
 
-      {/* Main Diagnostic Input - Stylized like the screenshot */}
+      {/* Main Diagnostic Input */}
       <div className="bg-white p-8 md:p-12 rounded-[48px] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.08)] border border-slate-50 relative">
         <form onSubmit={handleSearch} className="relative">
           <div className="relative bg-slate-50/50 rounded-[32px] border border-slate-100 p-8 min-h-[240px] flex flex-col">
@@ -58,7 +61,20 @@ const Troubleshoot: React.FC = () => {
               className="flex-1 w-full bg-transparent border-none outline-none text-xl md:text-2xl font-medium text-slate-700 placeholder:text-slate-300 transition-all resize-none"
             />
             
-            <div className="flex justify-end mt-4">
+            <div className="flex items-center justify-between mt-4">
+              <button 
+                type="button"
+                onClick={() => setUseWebSearch(!useWebSearch)}
+                className={`flex items-center space-x-2 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  useWebSearch 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                    : 'bg-white text-slate-400 border border-slate-100 hover:border-indigo-600 hover:text-indigo-600'
+                }`}
+              >
+                <Globe className="w-4 h-4" />
+                <span>Web Grounding {useWebSearch ? 'ON' : 'OFF'}</span>
+              </button>
+
               <button
                 type="submit"
                 disabled={isLoading || !query.trim()}
@@ -82,7 +98,9 @@ const Troubleshoot: React.FC = () => {
             <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
             <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce"></div>
           </div>
-          <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.2em]">Cross-referencing technical patterns...</p>
+          <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.2em]">
+            {useWebSearch ? 'Searching web for live patches & patterns...' : 'Cross-referencing technical patterns...'}
+          </p>
         </div>
       )}
 
@@ -108,6 +126,30 @@ const Troubleshoot: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Web Grounding Sources */}
+            {result.sources && result.sources.length > 0 && (
+              <div className="bg-indigo-50/30 rounded-[40px] p-10 border border-indigo-100 shadow-sm animate-in fade-in duration-500">
+                <div className="flex items-center space-x-4 mb-8">
+                  <Globe className="w-6 h-6 text-indigo-600" />
+                  <h3 className="text-xl font-black text-slate-900 leading-none uppercase tracking-widest text-sm">Verified Web Sources</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {result.sources.map((source, i) => (
+                    <a 
+                      key={i}
+                      href={source.uri}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between p-4 bg-white rounded-2xl border border-indigo-100 hover:border-indigo-600 transition-all group shadow-sm"
+                    >
+                      <span className="text-xs font-bold text-slate-700 truncate mr-4">{source.title || source.uri}</span>
+                      <ExternalLink className="w-4 h-4 text-slate-300 group-hover:text-indigo-600 transition-colors flex-shrink-0" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-8">

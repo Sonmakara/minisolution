@@ -24,10 +24,12 @@ import {
   ChevronRight,
   MessageSquareQuote,
   Users,
-  LogIn
+  LogIn,
+  FileText,
+  Ticket as TicketIcon
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
-import { AppRole, User as AppUser } from '../types';
+import { AppRole, User as AppUser, Guide, Ticket } from '../types';
 import { mockApi } from '../services/mockApi';
 
 interface LayoutProps {
@@ -46,6 +48,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   
+  // Search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<{ guides: Guide[], tickets: Ticket[] }>({ guides: [], tickets: [] });
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
   // Interactive states for header dropdowns
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -55,6 +63,30 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
   useEffect(() => {
     setCurrentUser(mockApi.getCurrentUser());
   }, [role, activePage]);
+
+  // Handle outside clicks for search dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Live search filtering
+  useEffect(() => {
+    if (searchQuery.length > 1) {
+      const q = searchQuery.toLowerCase();
+      const guides = mockApi.getGuides().filter(g => g.title.toLowerCase().includes(q) || g.excerpt.toLowerCase().includes(q));
+      const tickets = mockApi.getTickets().filter(t => t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q));
+      setSearchResults({ guides: guides.slice(0, 3), tickets: tickets.slice(0, 3) });
+      setIsSearchOpen(true);
+    } else {
+      setIsSearchOpen(false);
+    }
+  }, [searchQuery]);
 
   const userMenuItems = [
     { id: 'home', label: 'Home', icon: Home },
@@ -196,10 +228,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
             ? 'bg-white/80 backdrop-blur-md border-slate-100 shadow-sm' 
             : 'bg-white/90 backdrop-blur-lg border-slate-100 shadow-sm'
         }`}>
-          <div className="relative group w-64 md:w-96">
+          <div className="relative group w-64 md:w-96" ref={searchRef}>
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5 group-focus-within:text-indigo-600 transition-colors" />
             <input 
               type="text" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={isAdmin ? "Search assets, logs, tickets..." : "How can we help?"} 
               className={`w-full pl-12 pr-6 py-2.5 border-2 rounded-2xl focus:ring-0 transition-all text-sm font-medium ${
                 isAdmin 
@@ -207,6 +241,74 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
                   : 'bg-slate-100/30 border-slate-50 focus:bg-white focus:border-slate-900 shadow-sm'
               }`}
             />
+            
+            {/* Global Search Dropdown */}
+            {isSearchOpen && (
+              <div className="absolute top-full mt-3 left-0 w-full bg-white/95 backdrop-blur-xl rounded-[32px] shadow-2xl border border-slate-100 p-6 z-50 animate-in fade-in slide-in-from-top-4">
+                <div className="space-y-6">
+                  {searchResults.guides.length > 0 && (
+                    <div>
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-2">Articles</h4>
+                      {searchResults.guides.map(g => (
+                        <button 
+                          key={g.id}
+                          onClick={() => {
+                            setActivePage('knowledge');
+                            setIsSearchOpen(false);
+                            setSearchQuery('');
+                          }}
+                          className="w-full flex items-center space-x-3 p-3 hover:bg-slate-50 rounded-2xl transition-all text-left group"
+                        >
+                          <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <span className="text-sm font-bold text-slate-700 truncate">{g.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {searchResults.tickets.length > 0 && (
+                    <div>
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-2">Support Tickets</h4>
+                      {searchResults.tickets.map(t => (
+                        <button 
+                          key={t.id}
+                          onClick={() => {
+                            setActivePage('tickets');
+                            setIsSearchOpen(false);
+                            setSearchQuery('');
+                          }}
+                          className="w-full flex items-center space-x-3 p-3 hover:bg-slate-50 rounded-2xl transition-all text-left group"
+                        >
+                          <div className="w-8 h-8 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                            <TicketIcon className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col truncate">
+                             <span className="text-sm font-bold text-slate-700 truncate">{t.title}</span>
+                             <span className="text-[10px] text-slate-400 font-mono">#{t.id}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {searchResults.guides.length === 0 && searchResults.tickets.length === 0 && (
+                    <div className="py-4 text-center">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No local results</p>
+                      <button 
+                        onClick={() => {
+                          setActivePage('troubleshoot');
+                          setIsSearchOpen(false);
+                          setSearchQuery('');
+                        }}
+                        className="mt-4 text-indigo-600 text-[10px] font-black uppercase tracking-widest flex items-center justify-center w-full"
+                      >
+                        Try AI Analysis <ChevronRight className="w-4 h-4 ml-1" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center space-x-3 md:space-x-6">
@@ -432,7 +534,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
             }`}
           >
             <Sparkles className="w-8 h-8 text-white group-hover:rotate-12 transition-transform" />
-            <div className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 rounded-full border-4 border-slate-50 animate-pulse"></div>
+            <div className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-50 rounded-full border-4 border-slate-50 animate-pulse"></div>
             <div className="absolute right-full mr-8 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest py-3 px-6 rounded-2xl shadow-2xl opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-x-4 group-hover:translate-x-0 whitespace-nowrap">
               Need immediate technical help?
             </div>
