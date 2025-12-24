@@ -3,7 +3,7 @@
   "version": 2,
   "cleanUrls": true,
   "trailingSlash": false,
-  "outputDirectory": "dist",
+  "outputDirectory": "build",
   "rewrites": [
     {
       "source": "/api/(.*)",
