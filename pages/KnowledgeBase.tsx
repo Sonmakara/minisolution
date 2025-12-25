@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Book, 
@@ -14,7 +13,8 @@ import {
   Calendar,
   User,
   Share2,
-  ThumbsUp
+  ThumbsUp,
+  Bookmark
 } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 import { Guide, IssueCategory } from '../types';
@@ -23,6 +23,8 @@ const KnowledgeBase: React.FC = () => {
   const [guides, setGuides] = useState<Guide[]>([]);
   const [activeCategory, setActiveCategory] = useState<IssueCategory | 'ALL'>('ALL');
   const [selectedGuide, setSelectedGuide] = useState<Guide | null>(null);
+  const [liked, setLiked] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
   
   useEffect(() => {
     setGuides(mockApi.getGuides());
@@ -40,16 +42,31 @@ const KnowledgeBase: React.FC = () => {
     ? guides 
     : guides.filter(g => g.category === activeCategory);
 
+  const handleBack = () => {
+    setSelectedGuide(null);
+    setLiked(false);
+    setBookmarked(false);
+  };
+
   if (selectedGuide) {
     return (
       <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
-        <button 
-          onClick={() => setSelectedGuide(null)}
-          className="flex items-center text-slate-500 hover:text-indigo-600 font-bold text-sm group transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-          Back to Articles
-        </button>
+        <div className="flex items-center justify-between">
+          <button 
+            onClick={handleBack}
+            className="flex items-center text-slate-500 hover:text-indigo-600 font-bold text-sm group transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+            Back to Articles
+          </button>
+          
+          <button 
+            onClick={() => setBookmarked(!bookmarked)}
+            className={`p-3 rounded-2xl transition-all ${bookmarked ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100 hover:border-indigo-600 hover:text-indigo-600'}`}
+          >
+            <Bookmark className={`w-5 h-5 ${bookmarked ? 'fill-current' : ''}`} />
+          </button>
+        </div>
 
         <div className="bg-white rounded-[40px] p-8 md:p-12 border border-slate-100 shadow-xl shadow-slate-200/50">
           <div className="flex flex-wrap gap-2 mb-6">
@@ -78,8 +95,15 @@ const KnowledgeBase: React.FC = () => {
             </div>
             <div className="flex-1"></div>
             <div className="flex items-center space-x-2">
-              <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors"><ThumbsUp className="w-4 h-4" /></button>
-              <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors"><Share2 className="w-4 h-4" /></button>
+              <button 
+                onClick={() => setLiked(!liked)}
+                className={`p-2.5 rounded-xl transition-all ${liked ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-slate-100'}`}
+              >
+                <ThumbsUp className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
+              </button>
+              <button className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
+                <Share2 className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
@@ -99,7 +123,12 @@ const KnowledgeBase: React.FC = () => {
               <p className="text-slate-500 text-sm">Your feedback helps us improve our knowledge base.</p>
             </div>
             <div className="flex space-x-3">
-              <button className="px-6 py-3 bg-white text-slate-900 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95">Yes, definitely</button>
+              <button 
+                onClick={() => setLiked(true)}
+                className={`px-6 py-3 rounded-2xl font-bold shadow-sm transition-all active:scale-95 ${liked ? 'bg-indigo-600 text-white shadow-indigo-200' : 'bg-white text-slate-900 hover:shadow-md'}`}
+              >
+                Yes, definitely
+              </button>
               <button className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95">Not really</button>
             </div>
           </div>
