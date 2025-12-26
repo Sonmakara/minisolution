@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   LayoutDashboard, 
@@ -25,10 +26,13 @@ import {
   Users,
   LogIn,
   FileText,
-  Ticket as TicketIcon
+  Ticket as TicketIcon,
+  Circle,
+  Database,
+  Activity
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
-import { AppRole, User as AppUser, Guide, Ticket } from '../types';
+import { AppRole, User as AppUser, Guide, Ticket, Notification, NotificationType } from '../types';
 import { mockApi } from '../services/mockApi';
 
 interface LayoutProps {
@@ -47,6 +51,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   
+  // Notification states
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const unreadCount = notifications.filter(n => !n.read).length;
+  
   // Search states
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<{ guides: Guide[], tickets: Ticket[] }>({ guides: [], tickets: [] });
@@ -61,7 +69,29 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
 
   useEffect(() => {
     setCurrentUser(mockApi.getCurrentUser());
+    refreshNotifications();
+    
+    const handleNotifyUpdate = () => refreshNotifications();
+    window.addEventListener('notifications_updated', handleNotifyUpdate);
+    return () => window.removeEventListener('notifications_updated', handleNotifyUpdate);
   }, [role, activePage]);
+
+  const refreshNotifications = () => {
+    setNotifications(mockApi.getNotifications());
+  };
+
+  const handleMarkAsRead = (id: string) => {
+    mockApi.markNotificationAsRead(id);
+    refreshNotifications();
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    handleMarkAsRead(notification.id);
+    if (notification.link) {
+      setActivePage(notification.link);
+    }
+    setIsNotificationsOpen(false);
+  };
 
   // Handle outside clicks for search dropdown
   useEffect(() => {
@@ -138,10 +168,27 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
     }
   };
 
+  const getNotificationIcon = (type: NotificationType) => {
+    switch(type) {
+      case NotificationType.TICKET: return <LifeBuoy className="w-4 h-4" />;
+      case NotificationType.REVIEW: return <MessageSquareQuote className="w-4 h-4" />;
+      case NotificationType.SYSTEM: return <Activity className="w-4 h-4" />;
+      default: return <Bell className="w-4 h-4" />;
+    }
+  };
+
+  const getNotificationColor = (type: NotificationType) => {
+    switch(type) {
+      case NotificationType.TICKET: return 'bg-amber-100 text-amber-600';
+      case NotificationType.REVIEW: return 'bg-indigo-100 text-indigo-600';
+      case NotificationType.SYSTEM: return 'bg-red-100 text-red-600';
+      default: return 'bg-slate-100 text-slate-600';
+    }
+  };
+
   return (
     <div className={`min-h-screen flex flex-col md:flex-row font-inter antialiased transition-colors duration-500 ${isAdmin ? 'bg-slate-50' : 'bg-white'}`}>
       
-      {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-300" 
@@ -149,7 +196,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
         />
       )}
 
-      {/* Sidebar */}
       <aside className={`${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } md:translate-x-0 fixed md:sticky top-0 inset-y-0 left-0 z-50 w-72 h-screen transition-transform duration-500 border-r ${
@@ -233,7 +279,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className={`flex h-20 border-b items-center justify-between px-4 md:px-10 sticky top-0 z-30 transition-all ${
           isAdmin 
@@ -262,7 +307,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
                 }`}
               />
               
-              {/* Global Search Dropdown */}
               {isSearchOpen && (
                 <div className="absolute top-full mt-3 left-0 w-full bg-white rounded-[24px] shadow-2xl border border-slate-100 p-4 z-50 animate-in fade-in slide-in-from-top-4">
                   <div className="space-y-4">
@@ -311,7 +355,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
           </div>
 
           <div className="flex items-center space-x-2 md:space-x-6">
-            {/* AI Status Badge - Hidden on very small screens */}
             <div className={`hidden lg:flex items-center rounded-2xl px-4 py-2 border transition-all ${
                 isAdmin ? 'bg-slate-50 border-slate-100' : 'bg-indigo-50/50 border-indigo-100'
               }`}
@@ -320,7 +363,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
                <span className={`text-[8px] font-black uppercase tracking-widest ${isAdmin ? 'text-slate-500' : 'text-indigo-600'}`}>Engine Online</span>
             </div>
 
-            {/* Notifications Bell */}
             <div className="relative">
               <button 
                 onClick={() => {
@@ -332,28 +374,66 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
                 }`}
               >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-2 right-2 w-4 h-4 bg-red-500 text-white rounded-full border-2 border-white flex items-center justify-center text-[8px] font-black">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
               
               {isNotificationsOpen && (
-                <div className="absolute top-full mt-4 right-0 w-72 md:w-80 bg-white rounded-[24px] shadow-2xl border border-slate-100 py-4 px-4 z-50 animate-in fade-in slide-in-from-top-4">
-                  <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-4">Live Alerts</h4>
-                  <div className="space-y-3">
-                    <div className="flex space-x-3 p-2 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer">
-                      <div className="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <LifeBuoy className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">Ticket Escalation</p>
-                        <p className="text-[10px] text-slate-500 mt-0.5 truncate">Issue #88A requires attention</p>
-                      </div>
-                    </div>
+                <div className="absolute top-full mt-4 right-0 w-72 md:w-96 bg-white rounded-[24px] shadow-2xl border border-slate-100 py-4 px-4 z-50 animate-in fade-in slide-in-from-top-4 overflow-hidden">
+                  <div className="flex justify-between items-center mb-4 px-2">
+                    <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Live Alerts</h4>
+                    {unreadCount > 0 && <span className="text-[8px] font-black text-indigo-600 uppercase">Latest First</span>}
                   </div>
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto no-scrollbar">
+                    {notifications.length > 0 ? (
+                      notifications.map(n => (
+                        <div 
+                          key={n.id} 
+                          onClick={() => handleNotificationClick(n)}
+                          className={`flex space-x-3 p-3 rounded-xl transition-colors cursor-pointer border ${
+                            n.read ? 'bg-white border-transparent' : 'bg-slate-50/80 border-slate-100'
+                          } hover:bg-slate-100/50 group`}
+                        >
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${getNotificationColor(n.type)}`}>
+                            {getNotificationIcon(n.type)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex justify-between items-start">
+                              <p className="text-[11px] font-black text-slate-900 truncate">{n.title}</p>
+                              {!n.read && <Circle className="w-1.5 h-1.5 fill-indigo-600 text-indigo-600" />}
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">{n.message}</p>
+                            <p className="text-[8px] text-slate-400 mt-2 font-bold uppercase tracking-widest">
+                              {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-10 text-center">
+                        <Bell className="w-8 h-8 text-slate-100 mx-auto mb-2" />
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Everything's quiet</p>
+                      </div>
+                    )}
+                  </div>
+                  {notifications.length > 0 && (
+                    <button 
+                      onClick={() => {
+                        notifications.forEach(n => mockApi.markNotificationAsRead(n.id));
+                        refreshNotifications();
+                      }}
+                      className="w-full mt-4 py-2 border-t border-slate-100 text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:text-indigo-800 transition-colors"
+                    >
+                      Dismiss All
+                    </button>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* User Profile */}
             <div className="relative">
               {currentUser ? (
                 <button 
@@ -417,7 +497,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
           </div>
         </header>
 
-        {/* Global Floating Action for Admins on Guest View */}
         {!isAdmin && currentUser?.role === 'ADMIN' && (
           <div className="max-w-screen-2xl mx-auto px-4 md:px-10 pt-6 flex justify-end">
              <button 
@@ -438,7 +517,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, setActivePage, ro
         </div>
       </div>
 
-      {/* Responsive Floating AI Assistant */}
       <div className={`fixed bottom-4 right-4 md:bottom-8 md:right-8 z-50 transition-all duration-500`}>
         {isAiOpen ? (
           <div className="bg-white w-[90vw] sm:w-[400px] h-[75vh] sm:h-[600px] rounded-[32px] md:rounded-[48px] shadow-2xl border border-slate-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-12">

@@ -19,13 +19,31 @@ export enum UserStatus {
   DISABLED = 'DISABLED'
 }
 
+export enum NotificationType {
+  TICKET = 'TICKET',
+  REVIEW = 'REVIEW',
+  SYSTEM = 'SYSTEM',
+  KNOWLEDGE = 'KNOWLEDGE'
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+  link?: string;
+}
+
 export type AppRole = 'GUEST' | 'ADMIN';
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  password?: string; // Added for mock credential check
+  password?: string;
   role: 'USER' | 'ADMIN' | 'TECHNICIAN';
   status: UserStatus;
 }
@@ -41,7 +59,7 @@ export interface Comment {
 
 export interface Review {
   id: string;
-  resourceName: string; // Equivalent to the requested "Movie name" in the IT context
+  resourceName: string;
   userName: string;
   rating: number;
   comment: string;
@@ -67,6 +85,9 @@ export interface Guide {
   content: string;
   category: IssueCategory;
   tags: string[];
+  status: 'APPROVED' | 'PENDING';
+  authorName: string;
+  createdAt: string;
 }
 
 export interface DiagnosisResult {

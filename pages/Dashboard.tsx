@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   Users, 
@@ -7,7 +8,8 @@ import {
   TrendingUp,
   ArrowRight,
   ShieldCheck,
-  Zap
+  Zap,
+  Activity
 } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 import { TicketStatus } from '../types';
@@ -25,6 +27,11 @@ const Dashboard: React.FC = () => {
     { label: 'Score', value: '98%', icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-100' },
   ];
 
+  const triggerAlert = () => {
+    mockApi.triggerSystemHealthAlert();
+    alert("System health alert broadcasted to all administrators.");
+  };
+
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -32,11 +39,20 @@ const Dashboard: React.FC = () => {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">System Health</h1>
           <p className="text-sm text-slate-500 mt-1">Operational status: <span className="text-emerald-600 font-bold uppercase text-[10px] px-2 py-0.5 bg-emerald-50 rounded">Normal</span></p>
         </div>
-        <div className="flex items-center -space-x-2">
-          {[1,2,3,4].map(i => (
-            <img key={i} src={`https://i.pravatar.cc/150?u=${i+10}`} className="w-8 h-8 rounded-full border-2 border-white shadow-sm" alt="Team member" />
-          ))}
-          <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-400">+12</div>
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={triggerAlert}
+            className="px-4 py-2 bg-slate-950 text-white rounded-xl font-bold text-[9px] uppercase tracking-widest flex items-center space-x-2 hover:bg-slate-900 transition-all shadow-lg active:scale-95"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Trigger System Alert</span>
+          </button>
+          <div className="flex items-center -space-x-2">
+            {[1,2,3,4].map(i => (
+              <img key={i} src={`https://i.pravatar.cc/150?u=${i+10}`} className="w-8 h-8 rounded-full border-2 border-white shadow-sm" alt="Team member" />
+            ))}
+            <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-400">+12</div>
+          </div>
         </div>
       </div>
 

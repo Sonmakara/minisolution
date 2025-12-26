@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useRef } from 'react';
 import { 
   Wrench, 
   Search, 
@@ -11,9 +12,13 @@ import {
   Globe,
   ExternalLink,
   Copy,
-  Check
+  Check,
+  Camera,
+  X,
+  RotateCcw,
+  Zap
 } from 'lucide-react';
-import { getDiagnosticHelp, GroundedDiagnosisResult } from '../services/geminiService';
+import { getDiagnosticHelp, getVisualDiagnosticHelp, GroundedDiagnosisResult } from '../services/geminiService';
 
 const Troubleshoot: React.FC = () => {
   const [query, setQuery] = useState('');
@@ -22,14 +27,65 @@ const Troubleshoot: React.FC = () => {
   const [useWebSearch, setUseWebSearch] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
+  // Camera States
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const startCamera = async () => {
+    setIsCameraOpen(true);
+    setCapturedImage(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Camera access denied", err);
+      alert("Please allow camera access to use visual diagnostics.");
+      setIsCameraOpen(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+    }
+    setIsCameraOpen(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        setCapturedImage(dataUrl);
+        stopCamera();
+      }
+    }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!query.trim() && !capturedImage) return;
 
     setIsLoading(true);
     setResult(null);
     try {
-      const data = await getDiagnosticHelp(query, useWebSearch);
+      let data: GroundedDiagnosisResult;
+      if (capturedImage) {
+        const base64Data = capturedImage.split(',')[1];
+        data = await getVisualDiagnosticHelp(query || "Analyze this hardware issue.", base64Data, 'image/jpeg');
+      } else {
+        data = await getDiagnosticHelp(query, useWebSearch);
+      }
       setResult(data);
     } catch (error) {
       console.error(error);
@@ -53,47 +109,79 @@ const Troubleshoot: React.FC = () => {
         <div className="inline-flex items-center justify-center w-16 h-16 md:w-20 md:h-20 bg-indigo-50 text-indigo-600 rounded-2xl md:rounded-[32px] shadow-sm border border-indigo-100">
           <Sparkles className="w-8 h-8 md:w-10 md:h-10" />
         </div>
-        <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight">AI Intelligent Diagnostics</h1>
+        <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight">Intelligent IT Diagnostics</h1>
         <p className="text-slate-500 text-sm md:text-lg max-w-2xl mx-auto leading-relaxed px-4">
-          Describe your technical issue and let our AI suggest immediate solutions.
+          Describe your technical issue or snap a photo of the hardware for a visual AI diagnosis.
         </p>
       </div>
 
       {/* Main Diagnostic Input */}
-      <div className="bg-white p-4 md:p-12 rounded-3xl md:rounded-[48px] shadow-xl border border-slate-50">
+      <div className="bg-white p-4 md:p-12 rounded-3xl md:rounded-[48px] shadow-xl border border-slate-50 relative overflow-hidden">
+        {/* Visual Cue for Camera */}
+        {capturedImage && (
+          <div className="absolute top-0 right-0 m-4 sm:m-8 z-10 animate-in slide-in-from-right-4">
+             <div className="relative group">
+               <img src={capturedImage} className="w-24 h-24 sm:w-32 sm:h-32 object-cover rounded-2xl border-4 border-white shadow-xl rotate-3 group-hover:rotate-0 transition-transform" alt="Captured" />
+               <button 
+                onClick={() => setCapturedImage(null)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg"
+               >
+                 <X className="w-4 h-4" />
+               </button>
+             </div>
+          </div>
+        )}
+
         <form onSubmit={handleSearch} className="relative">
           <div className="relative bg-slate-50/50 rounded-2xl md:rounded-[32px] border border-slate-100 p-4 md:p-8 min-h-[180px] md:min-h-[240px] flex flex-col">
             <textarea
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="E.g. My printer is offline even though it's connected..."
+              placeholder={capturedImage ? "Describe what we see in the photo..." : "E.g. My printer is offline even though it's connected..."}
               className="flex-1 w-full bg-transparent border-none outline-none text-base md:text-2xl font-medium text-slate-700 placeholder:text-slate-300 transition-all resize-none"
             />
             
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
-              <button 
-                type="button"
-                onClick={() => setUseWebSearch(!useWebSearch)}
-                className={`w-full sm:w-auto flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                  useWebSearch 
-                    ? 'bg-indigo-600 text-white shadow-lg' 
-                    : 'bg-white text-slate-400 border border-slate-100'
-                }`}
-              >
-                <Globe className="w-3 h-3" />
-                <span>Web Grounding {useWebSearch ? 'ON' : 'OFF'}</span>
-              </button>
+              <div className="flex items-center space-x-2 w-full sm:w-auto">
+                <button 
+                  type="button"
+                  onClick={() => setUseWebSearch(!useWebSearch)}
+                  disabled={!!capturedImage}
+                  className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                    useWebSearch 
+                      ? 'bg-indigo-600 text-white shadow-lg' 
+                      : 'bg-white text-slate-400 border border-slate-100'
+                  } ${capturedImage ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+                >
+                  <Globe className="w-3 h-3" />
+                  <span>Search {useWebSearch ? 'ON' : 'OFF'}</span>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={startCamera}
+                  className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+                >
+                  <Camera className="w-3 h-3" />
+                  <span>{capturedImage ? 'Retake' : 'Scan Gear'}</span>
+                </button>
+              </div>
 
               <button
                 type="submit"
-                disabled={isLoading || !query.trim()}
+                disabled={isLoading || (!query.trim() && !capturedImage)}
                 className={`w-full sm:w-auto px-8 py-3 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest flex items-center justify-center space-x-3 shadow-lg transition-all active:scale-95 ${
-                  isLoading || !query.trim() 
+                  isLoading || (!query.trim() && !capturedImage)
                     ? 'bg-indigo-300 text-white opacity-60 cursor-not-allowed' 
                     : 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-indigo-500/20'
                 }`}
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Start Analysis</span>}
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                  <>
+                    <Zap className="w-4 h-4" />
+                    <span>Generate Solution</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -108,7 +196,7 @@ const Troubleshoot: React.FC = () => {
             <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce"></div>
           </div>
           <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">
-            {useWebSearch ? 'Browsing technical resources...' : 'Processing diagnostic model...'}
+            {capturedImage ? 'AI is analyzing your hardware scan...' : (useWebSearch ? 'Browsing technical resources...' : 'Processing diagnostic model...')}
           </p>
         </div>
       )}
@@ -118,9 +206,16 @@ const Troubleshoot: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
           <div className="lg:col-span-2 space-y-6 md:space-y-8">
             <div className="bg-white rounded-3xl md:rounded-[40px] p-6 md:p-10 border border-slate-100 shadow-xl">
-              <div className="flex items-center space-x-3 mb-6 md:mb-10">
-                <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                <h3 className="text-xl md:text-2xl font-black text-slate-900 leading-none">Resolution Strategy</h3>
+              <div className="flex items-center justify-between mb-6 md:mb-10">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                  <h3 className="text-xl md:text-2xl font-black text-slate-900 leading-none">Resolution Strategy</h3>
+                </div>
+                {capturedImage && (
+                  <div className="hidden sm:flex items-center px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[8px] font-black uppercase tracking-widest">
+                    Visual Assisted
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
                 {result.steps.map((step, idx) => (
@@ -203,6 +298,53 @@ const Troubleshoot: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Camera Modal */}
+      {isCameraOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-10 animate-in fade-in duration-300">
+           <div className="absolute top-4 sm:top-8 left-0 w-full px-8 flex justify-between items-center text-white">
+              <div>
+                <h4 className="text-sm font-black uppercase tracking-widest">Hardware Scanner</h4>
+                <p className="text-[10px] text-slate-400 uppercase tracking-tighter">Point at the component or screen</p>
+              </div>
+              <button onClick={stopCamera} className="bg-white/10 p-3 rounded-full hover:bg-white/20 transition-all">
+                <X className="w-6 h-6" />
+              </button>
+           </div>
+
+           <div className="relative w-full max-w-2xl aspect-video sm:aspect-[4/3] bg-black rounded-[32px] overflow-hidden shadow-2xl border border-white/10">
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 pointer-events-none border-[20px] sm:border-[40px] border-black/20">
+                <div className="w-full h-full border-2 border-white/20 rounded-xl flex items-center justify-center">
+                  <div className="w-12 h-12 border-2 border-indigo-500/50 rounded-full animate-ping"></div>
+                </div>
+              </div>
+           </div>
+
+           <div className="mt-8 sm:mt-12 flex items-center space-x-8">
+              <button 
+                onClick={stopCamera}
+                className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white"
+              >
+                <RotateCcw className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={capturePhoto}
+                className="w-20 h-20 rounded-full bg-white flex items-center justify-center p-1 shadow-2xl active:scale-90 transition-all"
+              >
+                <div className="w-full h-full rounded-full border-4 border-slate-900 bg-white"></div>
+              </button>
+              <div className="w-12"></div>
+           </div>
+
+           <canvas ref={canvasRef} className="hidden" />
         </div>
       )}
     </div>

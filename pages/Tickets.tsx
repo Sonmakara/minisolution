@@ -18,7 +18,8 @@ import {
   ArrowUp,
   ArrowDown,
   LogIn,
-  Fingerprint
+  Fingerprint,
+  ChevronDown
 } from 'lucide-react';
 import { mockApi } from '../services/mockApi';
 import { Ticket, IssueCategory, TicketStatus, User } from '../types';
@@ -36,6 +37,7 @@ const Tickets: React.FC<TicketsProps> = ({ onNavigate }) => {
   const [commentText, setCommentText] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [statusFilter, setStatusFilter] = useState<TicketStatus | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -92,8 +94,9 @@ const Tickets: React.FC<TicketsProps> = ({ onNavigate }) => {
 
   const filteredAndSortedTickets = tickets
     .filter(t => 
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      t.id.toLowerCase().includes(searchQuery.toLowerCase())
+      (statusFilter === 'ALL' || t.status === statusFilter) &&
+      (t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      t.id.toLowerCase().includes(searchQuery.toLowerCase()))
     )
     .sort((a, b) => {
       const dateA = new Date(a.createdAt).getTime();
@@ -130,13 +133,34 @@ const Tickets: React.FC<TicketsProps> = ({ onNavigate }) => {
       <div className="bg-white rounded-2xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
         <div className="p-4 md:p-6 bg-slate-50/50 border-b border-slate-100 flex flex-col lg:flex-row gap-4 items-center">
           <div className="flex items-center space-x-2 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 no-scrollbar">
+            {/* Sort Toggle */}
             <button 
               onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-              className="flex-shrink-0 px-4 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center space-x-2"
+              className="flex-shrink-0 px-4 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center space-x-2 hover:border-indigo-600 hover:text-indigo-600 transition-colors"
             >
               {sortOrder === 'desc' ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />}
               <span>{sortOrder === 'desc' ? 'New' : 'Old'}</span>
             </button>
+
+            {/* Status Filter Dropdown */}
+            <div className="relative group flex-shrink-0">
+              <div className="flex items-center px-4 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-500 space-x-2">
+                <Filter className="w-3 h-3" />
+                <select 
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="bg-transparent border-none outline-none cursor-pointer pr-1"
+                >
+                  <option value="ALL">All Status</option>
+                  <option value={TicketStatus.OPEN}>Open</option>
+                  <option value={TicketStatus.IN_PROGRESS}>In Progress</option>
+                  <option value={TicketStatus.RESOLVED}>Resolved</option>
+                  <option value={TicketStatus.CLOSED}>Closed</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Search Input */}
             <div className="relative flex-1 lg:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
               <input 
@@ -144,7 +168,7 @@ const Tickets: React.FC<TicketsProps> = ({ onNavigate }) => {
                 placeholder="ID or subject..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
+                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm transition-all"
               />
             </div>
           </div>
@@ -183,7 +207,8 @@ const Tickets: React.FC<TicketsProps> = ({ onNavigate }) => {
                       <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
                         ticket.status === TicketStatus.OPEN ? 'bg-amber-100 text-amber-700' :
                         ticket.status === TicketStatus.IN_PROGRESS ? 'bg-indigo-100 text-indigo-700' :
-                        'bg-emerald-100 text-emerald-700'
+                        ticket.status === TicketStatus.RESOLVED ? 'bg-emerald-100 text-emerald-700' :
+                        'bg-slate-200 text-slate-600'
                       }`}>
                         {ticket.status.replace('_', ' ')}
                       </span>
@@ -196,7 +221,7 @@ const Tickets: React.FC<TicketsProps> = ({ onNavigate }) => {
               ) : (
                 <tr>
                   <td colSpan={5} className="py-20 text-center">
-                    <p className="text-sm font-bold text-slate-400">No active records found.</p>
+                    <p className="text-sm font-bold text-slate-400">No active records found matching criteria.</p>
                   </td>
                 </tr>
               )}
@@ -228,7 +253,7 @@ const Tickets: React.FC<TicketsProps> = ({ onNavigate }) => {
             </div>
 
             <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
-              {/* Sidebar Info - Collapsible or scrollable on mobile */}
+              {/* Sidebar Info */}
               <div className="w-full lg:w-80 border-r border-slate-100 p-4 sm:p-8 space-y-6 overflow-y-auto bg-slate-50/30 flex-shrink-0">
                 <div>
                   <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Workflow State</h4>
